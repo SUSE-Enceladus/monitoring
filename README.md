@@ -33,5 +33,5 @@ metadata GPG signatures (i.e., that `repomd.xml.asc` and `repomd.xml.key` match
 # check_rmt_repos
 
 The script checks that the expected repositories are enabled and that
-directories for these respositories exist. It uses a configuration file, by
+directories for these repositories exist. It uses a configuration file, by
 default /etc/rmt-utils/rmt_repository_config.json
