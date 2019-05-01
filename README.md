@@ -29,3 +29,9 @@ exist
 The script monitors that repositories in the given directory have valid
 metadata GPG signatures (i.e., that `repomd.xml.asc` and `repomd.xml.key` match
 `repomd.xml`).
+
+# check_rmt_repos
+
+The script checks that the expected repositories are enabled and that
+directories for these repositories exist. It uses a configuration file, by
+default /etc/rmt-utils/rmt_repository_config.json

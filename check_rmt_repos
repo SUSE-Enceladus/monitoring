@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2019 SUSE LLC  All rights reserved.
+#
+# check_rmt_repos is free software: you can redistribute it
+# and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 2 of
+# the License.
+#
+# check_dir_empty is distributed in the hope that it will
+# be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with susePublicCloudInfoClient. If not, see
+# <http://www.gnu.org/licenses/>.
+#
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+
+# Nagios states
+OK = 0
+WARNING = 1
+CRITICAL = 2
+UNKNOWN = 3
+
+def get_enabled_rmt_repos():
+    repo_info_cmd = ['rmt-cli', 'repos', 'list', '--csv']
+    proc = subprocess.Popen(repo_info_cmd, stdout=subprocess.PIPE)
+    avail_repo_data, errors = proc.communicate()
+
+    if errors:
+        print('Error executing "rmt-cli repos list"')
+        sys.exit(CRITICAL)
+    
+    rmt_repos = {}
+    repo_table = avail_repo_data.decode().strip().split('\n')
+    for repo_data in repo_table:
+        repo_detail = repo_data.split(',')
+        id = repo_detail[0].strip()
+        rmt_repos[id] = True
+    return rmt_repos
+
+# Set up command line argument parsing
+argparse = argparse.ArgumentParser(description='Monitor repo setup for RMT')
+argparse.add_argument(
+    '-f', '--config-file',
+    dest='config_file_path',
+    default='/etc/rmt-utils/rmt_repository_config.json',
+    help='Path to json config file for RMT repo configuration',
+    metavar='CONFIG_FILE'
+)
+args = argparse.parse_args()
+
+rmt_repos = get_enabled_rmt_repos()
+
+if not os.path.exists(args.config_file_path):
+    print('Missing "%s"' % args.config_file_path)
+    sys.exit(CRITICAL)
+
+with open(args.config_file_path) as json_file:
+    config_repos = json.load(json_file)
+    for id, repo_info in config_repos.items():
+        if not rmt_repos.get(id):
+            print("%s (%s) is not enabled" % (repo_info.get('description'), id))
+            sys.exit(CRITICAL)
+        # TO DO check if a mirror process is in progress, if yes do not
+        # complain if directory is missing
+        full_repo_path = '/var/lib/rmt/public/repo/' + repo_info.get('location')
+        if not os.path.exists(full_repo_path):
+            print('Missing package directory: "%s"' % full_repo_path)
+            sys.exit(CRITICAL)
+
