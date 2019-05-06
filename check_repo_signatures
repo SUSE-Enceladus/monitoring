@@ -3,11 +3,13 @@
 require 'shellwords'
 require 'logger'
 require 'optparse'
+require 'tempfile'
 
 class RepoSignatureChecker
   def initialize
     @repo_dir = '/srv/www/htdocs/repo'
-    @keyring_path = '/tmp/repo-check-keyring.gpg'
+    @keyring = Tempfile.new('repo-check-keyring')
+    @keyring.close
 
     parse_options
     @logger = Logger.new(@opt_nagios ? IO::NULL : STDOUT)
@@ -23,7 +25,7 @@ class RepoSignatureChecker
   end
 
   def check_repo(dir)
-    cmd = "gpg --no-default-keyring --keyring #{@keyring_path} --import #{dir}/repomd.xml.key 2>&1"
+    cmd = "gpg --no-default-keyring --keyring #{@keyring.path} --import #{dir}/repomd.xml.key 2>&1"
     out = `#{cmd}`
 
     if $?.exitstatus != 0
@@ -32,7 +34,7 @@ class RepoSignatureChecker
       return false
     end
 
-    cmd = "gpg --no-default-keyring --keyring #{@keyring_path} --verify #{dir}/repomd.xml.asc #{dir}/repomd.xml 2>&1"
+    cmd = "gpg --no-default-keyring --keyring #{@keyring.path} --verify #{dir}/repomd.xml.asc #{dir}/repomd.xml 2>&1"
     out = `#{cmd}`
 
     if $?.exitstatus != 0
@@ -45,7 +47,6 @@ class RepoSignatureChecker
   end
 
   def run
-    `rm -rf #{@keyring_path}`
     repodata_dirs = `find #{@repo_dir} -type d -name repodata`
     if repodata_dirs.empty?
       puts "No repositories found in #{@repo_dir}"
@@ -67,7 +68,11 @@ class RepoSignatureChecker
     else
       exit 0
     end
+  ensure
+    gpg_backup_file = @keyring.path + "~"
+    File.unlink(gpg_backup_file) if File.exist?(gpg_backup_file)
+    @keyring.unlink
   end
 end
 
-RepoSignatureChecker.new().run
+RepoSignatureChecker.new.run
