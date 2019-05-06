@@ -16,7 +16,7 @@
 #
 
 Name:           monitoring-plugins-repo-signatures
-Version:        20190330
+Version:        20190506
 Release:        0
 Summary:        Check mirrored repository metadata signature validity
 License:        GPL-2.0
