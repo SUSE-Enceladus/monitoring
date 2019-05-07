@@ -46,6 +46,20 @@ def get_enabled_rmt_repos():
         rmt_repos[id] = True
     return rmt_repos
 
+def get_rmt_cli_command():
+    rmt_cli_pid = get_rmt_cli_pid()
+    rmt_cli_cmd = None
+    if rmt_cli_pid:
+        rmt_cli_cmd = open('/proc/%s/cmdline' % rmt_cli_pid, 'r').read()
+        rmt_cli_cmd = rmt_cli_cmd.replace('\x00', ' ')
+    return rmt_cli_cmd
+
+def get_rmt_cli_pid():
+    rmt_cli_pid_cmd = ['ps', '-C', 'rmt-cli', '-o', 'pid=']
+    rmt_cli_pid = subprocess.Popen(rmt_cli_pid_cmd, stdout=subprocess.PIPE)
+    pid_data = rmt_cli_pid.communicate()
+    return pid_data[0].strip().decode()
+
 # Set up command line argument parsing
 argparse = argparse.ArgumentParser(description='Monitor repo setup for RMT')
 argparse.add_argument(
@@ -63,16 +77,27 @@ if not os.path.exists(args.config_file_path):
     print('Missing "%s"' % args.config_file_path)
     sys.exit(CRITICAL)
 
+not_enabled = []
+missing_repo_dirs = []
 with open(args.config_file_path) as json_file:
     config_repos = json.load(json_file)
     for id, repo_info in config_repos.items():
         if not rmt_repos.get(id):
-            print("%s (%s) is not enabled" % (repo_info.get('description'), id))
-            sys.exit(CRITICAL)
-        # TO DO check if a mirror process is in progress, if yes do not
-        # complain if directory is missing
+            not_enabled.append('%s, %s' % (repo_info.get('description'), id))
+        if 'mirror' in get_rmt_cli_command():
+            # WHile the mirro process is running we do not complain about
+            # missing directories. They are expected to show up at the end
+            # of the mirror process.
+            continue
         full_repo_path = '/var/lib/rmt/public/repo/' + repo_info.get('location')
         if not os.path.exists(full_repo_path):
-            print('Missing package directory: "%s"' % full_repo_path)
-            sys.exit(CRITICAL)
+            missing_repo_dirs.append(full_repo_path)
 
+if not_enabled:
+    print('Following expected repos are not enabled: "%s"' % str(not_enabled))
+    sys.exit(CRITICAL)
+if missing_repo_dirs:
+    print(
+        'Following repo directories are missing: "%s"' %str(missing_repo_dirs)
+    )
+    sys.exit(CRITICAL)

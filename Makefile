@@ -1,6 +1,8 @@
 dirEmptyVer =  $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-dir-empty.spec)
 procHangVer = $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-proc-timed-hang.spec)
+repCheckVer = $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-rmt-repos.spec)
 repoSigVer = $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-repo-signatures.spec)
+
 
 check:
 	@flake8 check_dir_empty check_proc_timed_hang
@@ -16,6 +18,12 @@ tar-proc-hang:
 	cp check_proc_timed_hang LICENSE "check_proc_timed_hang_$(procHangVer)"
 	tar -cjf "check_proc_timed_hang_$(procHangVer).tar.bz2" "check_proc_timed_hang_$(procHangVer)"
 	rm -rf "check_proc_timed_hang_$(procHangVer)"
+
+tar-repo-check:
+	mkdir "check_rmt_repos_$(repCheckVer)"
+	cp check_rmt_repos LICENSE "check_rmt_repos_$(repCheckVer)"
+	tar -cjf "check_rmt_repos_$(repCheckVer).tar.bz2" "check_rmt_repos_$(repCheckVer)"
+	rm -rf "check_rmt_repos_$(repCheckVer)"
 
 tar-repo-sig:
 	mkdir "monitoring-plugins-repo-signatures-$(repoSigVer)"
