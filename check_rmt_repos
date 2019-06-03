@@ -84,8 +84,9 @@ with open(args.config_file_path) as json_file:
     for id, repo_info in config_repos.items():
         if not rmt_repos.get(id):
             not_enabled.append('%s, %s' % (repo_info.get('description'), id))
-        if 'mirror' in get_rmt_cli_command():
-            # WHile the mirro process is running we do not complain about
+        rmt_cli_command = get_rmt_cli_command()
+        if rmt_cli_command and 'mirror' in rmt_cli_command:
+            # While the mirror process is running we do not complain about
             # missing directories. They are expected to show up at the end
             # of the mirror process.
             continue
