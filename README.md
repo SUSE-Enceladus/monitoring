@@ -35,3 +35,8 @@ metadata GPG signatures (i.e., that `repomd.xml.asc` and `repomd.xml.key` match
 The script checks that the expected repositories are enabled and that
 directories for these repositories exist. It uses a configuration file, by
 default /etc/rmt-utils/rmt_repository_config.json
+
+# check_old_files
+
+The script monitors that files older than given number of minutes don't exist in
+a directory.
