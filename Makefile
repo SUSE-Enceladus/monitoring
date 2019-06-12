@@ -2,7 +2,7 @@ dirEmptyVer =  $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-di
 procHangVer = $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-proc-timed-hang.spec)
 repCheckVer = $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-rmt-repos.spec)
 repoSigVer = $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-repo-signatures.spec)
-
+oldFilesVer = $(shell rpm -q --specfile --qf '%{VERSION}' monitoring-plugins-old-files.spec)
 
 check:
 	@flake8 check_dir_empty check_proc_timed_hang
@@ -30,3 +30,9 @@ tar-repo-sig:
 	cp check_repo_signatures LICENSE "monitoring-plugins-repo-signatures-$(repoSigVer)"
 	tar -cjf "monitoring-plugins-repo-signatures-$(repoSigVer).tar.bz2" "monitoring-plugins-repo-signatures-$(repoSigVer)"
 	rm -rf "monitoring-plugins-repo-signatures-$(repoSigVer)"
+
+tar-old-files:
+	mkdir "monitoring-plugins-old-files-$(oldFilesVer)"
+	cp check_old_files LICENSE "monitoring-plugins-old-files-$(oldFilesVer)"
+	tar -cjf "monitoring-plugins-old-files-$(oldFilesVer).tar.bz2" "monitoring-plugins-old-files-$(oldFilesVer)"
+	rm -rf "monitoring-plugins-old-files-$(oldFilesVer)"

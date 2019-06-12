@@ -1,0 +1,60 @@
+#!/usr/bin/python3
+
+# Copyright (c) 2019 SUSE LLC  All rights reserved.
+#
+# check_old_files is free software: you can redistribute it
+# and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 2 of
+# the License.
+#
+# check_old_files is distributed in the hope that it will
+# be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this check_old_files. If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Usage: check_old_files -h | --help
+       check_old_files -d <dir> -m <max_age>
+
+Options:
+    -h --help                         Show help
+    -d <dir> --directory <dir>        The path to the directory to be monitored
+    -m <max_age> --max-age <max_age>  Maximum file age in minutes
+"""
+
+import os
+import sys
+import time
+
+from docopt import docopt
+
+# Command line processing
+command_args = docopt(__doc__)
+
+# Nagios states
+OK = 0
+WARNING = 1
+CRITICAL = 2
+UNKNOWN = 3
+
+dir_to_monitor = command_args.get('--directory')
+max_age_minutes = int(command_args.get('--max-age'))
+
+if not dir_to_monitor:
+    print(__doc__)
+    sys.exit(WARNING)
+
+found_old_files = False
+for root, dirs, files in os.walk(dir_to_monitor):
+    for filename in files:
+        path = os.path.join(root, filename)
+        stat = os.stat(path)
+        if (time.time() - stat.st_mtime >= max_age_minutes * 60):
+            print('%s is older than %s minutes' % (path, max_age_minutes))
+            found_old_files = True
+
+sys.exit(CRITICAL if found_old_files else OK)
