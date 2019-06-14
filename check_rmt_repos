@@ -7,13 +7,13 @@
 # as published by the Free Software Foundation, version 2 of
 # the License.
 #
-# check_dir_empty is distributed in the hope that it will
+# check_rmt_repos is distributed in the hope that it will
 # be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
 # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with susePublicCloudInfoClient. If not, see
+# along with check_rmt_repos. If not, see
 # <http://www.gnu.org/licenses/>.
 #
 
@@ -22,6 +22,8 @@ import json
 import os
 import subprocess
 import sys
+import csv
+from io import StringIO
 
 # Nagios states
 OK = 0
@@ -39,11 +41,14 @@ def get_enabled_rmt_repos():
         sys.exit(CRITICAL)
     
     rmt_repos = {}
-    repo_table = avail_repo_data.decode().strip().split('\n')
-    for repo_data in repo_table:
-        repo_detail = repo_data.split(',')
+    f = StringIO(avail_repo_data.decode())
+    f.readline() # skip table headers
+    csv_reader = csv.reader(f, delimiter=',')
+    for repo_detail in csv_reader:
         id = repo_detail[0].strip()
-        rmt_repos[id] = True
+        name = repo_detail[1].strip()
+        rmt_repos[id] = name
+
     return rmt_repos
 
 def get_rmt_cli_command():
@@ -77,28 +82,39 @@ if not os.path.exists(args.config_file_path):
     print('Missing "%s"' % args.config_file_path)
     sys.exit(CRITICAL)
 
+rmt_cli_command = get_rmt_cli_command()
+if rmt_cli_command and 'mirror' in rmt_cli_command:
+    # While the mirror process is running we do not complain about
+    # missing directories. They are expected to show up at the end
+    # of the mirror process.
+    sys.exit(OK)
+
 not_enabled = []
 missing_repo_dirs = []
+extra_repos = []
 with open(args.config_file_path) as json_file:
     config_repos = json.load(json_file)
     for id, repo_info in config_repos.items():
         if not rmt_repos.get(id):
             not_enabled.append('%s, %s' % (repo_info.get('description'), id))
-        rmt_cli_command = get_rmt_cli_command()
-        if rmt_cli_command and 'mirror' in rmt_cli_command:
-            # While the mirror process is running we do not complain about
-            # missing directories. They are expected to show up at the end
-            # of the mirror process.
-            continue
         full_repo_path = '/var/lib/rmt/public/repo/' + repo_info.get('location')
         if not os.path.exists(full_repo_path):
             missing_repo_dirs.append(full_repo_path)
 
+        if rmt_repos.get(id):
+            del rmt_repos[id]
+
+    for id, repo_name in rmt_repos.items():
+        extra_repos.append(repo_name)
+
 if not_enabled:
     print('Following expected repos are not enabled: "%s"' % str(not_enabled))
-    sys.exit(CRITICAL)
 if missing_repo_dirs:
     print(
-        'Following repo directories are missing: "%s"' %str(missing_repo_dirs)
+        'Following repo directories are missing: "%s"' % str(missing_repo_dirs)
     )
+if extra_repos:
+    print('Following repos are extra: "%s"' % str(extra_repos))
+
+if not_enabled or missing_repo_dirs or extra_repos:
     sys.exit(CRITICAL)
