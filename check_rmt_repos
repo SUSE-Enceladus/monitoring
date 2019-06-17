@@ -31,6 +31,7 @@ WARNING = 1
 CRITICAL = 2
 UNKNOWN = 3
 
+
 def get_enabled_rmt_repos():
     repo_info_cmd = ['rmt-cli', 'repos', 'list', '--csv']
     proc = subprocess.Popen(repo_info_cmd, stdout=subprocess.PIPE)
@@ -39,10 +40,10 @@ def get_enabled_rmt_repos():
     if errors:
         print('Error executing "rmt-cli repos list"')
         sys.exit(CRITICAL)
-    
+
     rmt_repos = {}
     f = StringIO(avail_repo_data.decode())
-    f.readline() # skip table headers
+    f.readline()  # skip table headers
     csv_reader = csv.reader(f, delimiter=',')
     for repo_detail in csv_reader:
         id = repo_detail[0].strip()
@@ -50,6 +51,7 @@ def get_enabled_rmt_repos():
         rmt_repos[id] = name
 
     return rmt_repos
+
 
 def get_rmt_cli_command():
     rmt_cli_pid = get_rmt_cli_pid()
@@ -59,11 +61,22 @@ def get_rmt_cli_command():
         rmt_cli_cmd = rmt_cli_cmd.replace('\x00', ' ')
     return rmt_cli_cmd
 
+
 def get_rmt_cli_pid():
     rmt_cli_pid_cmd = ['ps', '-C', 'rmt-cli', '-o', 'pid=']
     rmt_cli_pid = subprocess.Popen(rmt_cli_pid_cmd, stdout=subprocess.PIPE)
     pid_data = rmt_cli_pid.communicate()
     return pid_data[0].strip().decode()
+
+
+def get_mirrored_repos():
+    mirrored_repos = {}
+    for root, dirs, files in os.walk('/var/lib/rmt/public/repo'):
+        for dirname in dirs:
+            if dirname == 'repodata':
+                mirrored_repos[root] = True
+    return mirrored_repos
+
 
 # Set up command line argument parsing
 argparse = argparse.ArgumentParser(description='Monitor repo setup for RMT')
@@ -75,8 +88,8 @@ argparse.add_argument(
     metavar='CONFIG_FILE'
 )
 args = argparse.parse_args()
-
-rmt_repos = get_enabled_rmt_repos()
+enabled_repos = get_enabled_rmt_repos()
+mirrored_repos = get_mirrored_repos()
 
 if not os.path.exists(args.config_file_path):
     print('Missing "%s"' % args.config_file_path)
@@ -91,21 +104,28 @@ if rmt_cli_command and 'mirror' in rmt_cli_command:
 
 not_enabled = []
 missing_repo_dirs = []
-extra_repos = []
+extra_enabled_repos = []
+extra_mirrored_repos = []
 with open(args.config_file_path) as json_file:
     config_repos = json.load(json_file)
     for id, repo_info in config_repos.items():
-        if not rmt_repos.get(id):
+        if not enabled_repos.get(id):
             not_enabled.append('%s, %s' % (repo_info.get('description'), id))
-        full_repo_path = '/var/lib/rmt/public/repo/' + repo_info.get('location')
+        full_repo_path = '/var/lib/rmt/public/repo/' \
+            + repo_info.get('location').strip('/')
+
+        if mirrored_repos.get(full_repo_path):
+            del mirrored_repos[full_repo_path]
+
         if not os.path.exists(full_repo_path):
             missing_repo_dirs.append(full_repo_path)
 
-        if rmt_repos.get(id):
-            del rmt_repos[id]
+        if enabled_repos.get(id):
+            del enabled_repos[id]
 
-    for id, repo_name in rmt_repos.items():
-        extra_repos.append(repo_name)
+    for id, repo_name in enabled_repos.items():
+        extra_enabled_repos.append(repo_name)
+    extra_mirrored_repos = list(mirrored_repos.keys())
 
 if not_enabled:
     print('Following expected repos are not enabled: "%s"' % str(not_enabled))
@@ -113,8 +133,14 @@ if missing_repo_dirs:
     print(
         'Following repo directories are missing: "%s"' % str(missing_repo_dirs)
     )
-if extra_repos:
-    print('Following repos are extra: "%s"' % str(extra_repos))
+if extra_enabled_repos:
+    print('Following enabled repos are extra: "%s"' % str(extra_enabled_repos))
 
-if not_enabled or missing_repo_dirs or extra_repos:
+if extra_mirrored_repos:
+    print(
+        'Following mirrored repos are extra: "%s"' % str(extra_mirrored_repos)
+    )
+
+if not_enabled or missing_repo_dirs or extra_enabled_repos \
+        or extra_mirrored_repos:
     sys.exit(CRITICAL)
