@@ -108,24 +108,27 @@ extra_enabled_repos = []
 extra_mirrored_repos = []
 with open(args.config_file_path) as json_file:
     config_repos = json.load(json_file)
-    for id, repo_info in config_repos.items():
-        if not enabled_repos.get(id):
-            not_enabled.append('%s, %s' % (repo_info.get('description'), id))
-        full_repo_path = '/var/lib/rmt/public/repo/' \
-            + repo_info.get('location').strip('/')
-
-        if mirrored_repos.get(full_repo_path):
-            del mirrored_repos[full_repo_path]
-
-        if not os.path.exists(full_repo_path):
-            missing_repo_dirs.append(full_repo_path)
-
-        if enabled_repos.get(id):
-            del enabled_repos[id]
-
-    for id, repo_name in enabled_repos.items():
-        extra_enabled_repos.append(repo_name)
-    extra_mirrored_repos = list(mirrored_repos.keys())
+    for config_repo in config_repos:
+        for id, repo_info in config_repo.items():
+            if not enabled_repos.get(id):
+                not_enabled.append('%s, %s' % (
+                    repo_info.get('description'), id)
+                )
+            full_repo_path = '/var/lib/rmt/public/repo/' \
+                + repo_info.get('location').strip('/')
+    
+            if mirrored_repos.get(full_repo_path):
+                del mirrored_repos[full_repo_path]
+    
+            if not os.path.exists(full_repo_path):
+                missing_repo_dirs.append(full_repo_path)
+    
+            if enabled_repos.get(id):
+                del enabled_repos[id]
+    
+        for id, repo_name in enabled_repos.items():
+            extra_enabled_repos.append(repo_name)
+        extra_mirrored_repos = list(mirrored_repos.keys())
 
 if not_enabled:
     print('Following expected repos are not enabled: "%s"' % str(not_enabled))
