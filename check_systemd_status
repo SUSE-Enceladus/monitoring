@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+
+# Nagios Exit Codes
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOWN=3
+
+usage()
+{
+cat <<EOF
+Check the status of systemd service
+     Options:
+	-a	Only check to see if Unit is Active
+	-e	Only check to see if Unit is Enabled
+        -u	Specify Systemd Unit 
+Usage: $0 -au rmt-server-mirror.timer
+Usage: $0 -eu rmt-server-mirror.timer
+Usage: $0 -u rmt-server-mirror.timer
+EOF
+}
+
+# Define now to prevent expected number errors
+CRIT=0
+WARN=0
+
+ACTIVE=1
+ENABLED=1
+while getopts "u:eu:au:eau" OPTION
+do
+     case $OPTION in
+         u)
+             UNIT="$OPTARG"
+             ;;
+         a)
+             ACTIVE=0
+             ;;
+         e)
+             ENABLED=0
+             ;;
+         \?)
+             exit 1
+             ;;
+     esac
+done
+
+active=$(systemctl is-active "$UNIT")
+ar=$?
+enabled=$(systemctl is-enabled "$UNIT")
+er=$?
+echo "er is $er"
+echo "ar is $ar"
+if [ $ACTIVE -eq 0 ] && [ $ENABLED -eq 0 ]; then
+	if [ $ar -ne 0 ] && [ $er -ne 0 ]; then
+		echo "$UNIT is neither active nor enabled"
+		exit $WARN
+	fi
+	if [ $ar -ne 0 ]; then
+		echo "$UNIT is not active"
+		exit $WARN
+	fi
+	if [ $er -ne 0 ]; then
+		echo "$UNIT is not enabled"
+		exit $WARN
+	fi	
+	if [ $er -eq 0 ] && [ $ar -eq 0 ]; then
+		echo "$UNIT is both enabled and active"
+		exit $OK
+	fi
+elif [ $ACTIVE -eq 0 ]; then
+	if [ $ar -ne 0 ]; then
+		echo "$UNIT is not active"
+		exit $WARN
+	else
+		echo "$UNIT is active"
+		exit $OK
+	fi
+elif [ $ENABLED -eq 0 ]; then
+	if [ $er -ne 0 ]; then
+		echo "$UNIT is not enabled"
+		exit $WARN
+	else
+		echo "$UNIT is enabled"
+		exit $OK
+	fi
+else
+	if [ $ar -ne 0 ] && [ $er -ne 0 ]; then
+		echo "$UNIT is neither active nor enabled"
+		exit $WARN
+	fi
+	if [ $ar -ne 0 ]; then
+		echo "$UNIT is not active"
+		exit $WARN
+	fi
+	if [ $er -ne 0 ]; then
+		echo "$UNIT is not enabled"
+		exit $WARN
+	fi	
+	if [ $er -eq 0 ] && [ $ar -eq 0 ]; then
+		echo "$UNIT is both enabled and active"
+		exit $OK
+	fi
+
+fi
