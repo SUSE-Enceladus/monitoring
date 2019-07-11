@@ -87,6 +87,14 @@ argparse.add_argument(
     help='Path to json config file for RMT repo configuration',
     metavar='CONFIG_FILE'
 )
+help_msg = 'A designator that will compare the repository configuration '
+help_msg += '"framework" setting with the provided value'
+argparse.add_argument(
+    '--cloud',
+    dest='framework',
+    required=True,
+    help=help_msg
+)
 args = argparse.parse_args()
 enabled_repos = get_enabled_rmt_repos()
 mirrored_repos = get_mirrored_repos()
@@ -102,6 +110,7 @@ if rmt_cli_command and 'mirror' in rmt_cli_command:
     # of the mirror process.
     sys.exit(OK)
 
+configured_repo_ids = []
 not_enabled = []
 missing_repo_dirs = []
 extra_enabled_repos = []
@@ -110,25 +119,30 @@ with open(args.config_file_path) as json_file:
     config_repos = json.load(json_file)
     for config_repo in config_repos:
         for id, repo_info in config_repo.items():
+            repo_framework = repo_info.get('framework')
+            if repo_framework and repo_framework != args.framework:
+                # Skip repos that are not configured for this framework
+                continue
+            configured_repo_ids.append(id)
             if not enabled_repos.get(id):
                 not_enabled.append('%s, %s' % (
                     repo_info.get('description'), id)
                 )
+            # SLES 11 repo relative paths start with /repo, we have to
+            # filter that out
             full_repo_path = '/var/lib/rmt/public/repo/' \
-                + repo_info.get('location').strip('/')
+                + repo_info.get('location').strip('/').split('repo')[-1]
     
             if mirrored_repos.get(full_repo_path):
                 del mirrored_repos[full_repo_path]
     
             if not os.path.exists(full_repo_path):
                 missing_repo_dirs.append(full_repo_path)
-    
-            if enabled_repos.get(id):
-                del enabled_repos[id]
-    
-        for id, repo_name in enabled_repos.items():
+
+    for id, repo_name in enabled_repos.items():
+        if id not in configured_repo_ids:
             extra_enabled_repos.append(repo_name)
-        extra_mirrored_repos = list(mirrored_repos.keys())
+    extra_mirrored_repos = list(mirrored_repos.keys())
 
 if not_enabled:
     print('Following expected repos are not enabled: "%s"' % str(not_enabled))
