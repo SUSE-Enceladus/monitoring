@@ -92,7 +92,6 @@ help_msg += '"framework" setting with the provided value'
 argparse.add_argument(
     '--cloud',
     dest='framework',
-    required=True,
     help=help_msg
 )
 args = argparse.parse_args()
@@ -110,6 +109,10 @@ if rmt_cli_command and 'mirror' in rmt_cli_command:
     # of the mirror process.
     sys.exit(OK)
 
+framework_to_use = None
+if args.framework:
+    framework_to_use = args.framework
+
 configured_repo_ids = []
 not_enabled = { 'ids': [], 'descriptions': [] }
 missing_repo_dirs = []
@@ -120,7 +123,7 @@ with open(args.config_file_path) as json_file:
     for config_repo in config_repos:
         for id, repo_info in config_repo.items():
             repo_framework = repo_info.get('framework')
-            if repo_framework and repo_framework != args.framework:
+            if repo_framework and repo_framework != framework_to_use:
                 # Skip repos that are not configured for this framework
                 continue
             configured_repo_ids.append(id)
