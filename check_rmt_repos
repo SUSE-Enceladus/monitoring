@@ -47,8 +47,8 @@ def get_enabled_rmt_repos():
     csv_reader = csv.reader(f, delimiter=',')
     for repo_detail in csv_reader:
         id = repo_detail[0].strip()
-        name = repo_detail[1].strip()
-        rmt_repos[id] = name
+        description = repo_detail[2].strip()
+        rmt_repos[id] = description
 
     return rmt_repos
 
@@ -87,6 +87,13 @@ argparse.add_argument(
     help='Path to json config file for RMT repo configuration',
     metavar='CONFIG_FILE'
 )
+help_msg = 'A designator that will compare the repository configuration '
+help_msg += '"framework" setting with the provided value'
+argparse.add_argument(
+    '--cloud',
+    dest='framework',
+    help=help_msg
+)
 args = argparse.parse_args()
 enabled_repos = get_enabled_rmt_repos()
 mirrored_repos = get_mirrored_repos()
@@ -102,45 +109,72 @@ if rmt_cli_command and 'mirror' in rmt_cli_command:
     # of the mirror process.
     sys.exit(OK)
 
-not_enabled = []
+framework_to_use = None
+if args.framework:
+    framework_to_use = args.framework
+
+configured_repo_ids = []
+not_enabled = { 'ids': [], 'descriptions': [] }
 missing_repo_dirs = []
-extra_enabled_repos = []
+extra_enabled_repos = { 'ids': [], 'descriptions': [] }
 extra_mirrored_repos = []
 with open(args.config_file_path) as json_file:
     config_repos = json.load(json_file)
-    for id, repo_info in config_repos.items():
-        if not enabled_repos.get(id):
-            not_enabled.append('%s, %s' % (repo_info.get('description'), id))
-        full_repo_path = '/var/lib/rmt/public/repo/' \
-            + repo_info.get('location').strip('/')
+    for config_repo in config_repos:
+        for id, repo_info in config_repo.items():
+            repo_framework = repo_info.get('framework')
+            if repo_framework and repo_framework != framework_to_use:
+                # Skip repos that are not configured for this framework
+                continue
+            configured_repo_ids.append(id)
+            if not enabled_repos.get(id):
+                not_enabled['ids'].append(id)
+                not_enabled['descriptions'].append(
+                    repo_info.get('description')
+                )
+            # SLES 11 repo relative paths start with /repo, we have to
+            # filter that out
+            full_repo_path = '/var/lib/rmt/public/repo/' \
+                + repo_info.get('location').strip('/').split('repo')[-1]
+    
+            if mirrored_repos.get(full_repo_path):
+                del mirrored_repos[full_repo_path]
+    
+            if not os.path.exists(full_repo_path):
+                missing_repo_dirs.append(full_repo_path)
 
-        if mirrored_repos.get(full_repo_path):
-            del mirrored_repos[full_repo_path]
-
-        if not os.path.exists(full_repo_path):
-            missing_repo_dirs.append(full_repo_path)
-
-        if enabled_repos.get(id):
-            del enabled_repos[id]
-
-    for id, repo_name in enabled_repos.items():
-        extra_enabled_repos.append(repo_name)
+    for id, repo_description in enabled_repos.items():
+        if id not in configured_repo_ids:
+            extra_enabled_repos['ids'].append(id)
+            extra_enabled_repos['descriptions'].append(repo_description)
     extra_mirrored_repos = list(mirrored_repos.keys())
 
-if not_enabled:
-    print('Following expected repos are not enabled: "%s"' % str(not_enabled))
+if not_enabled['ids']:
+    print('Following expected repos are not enabled:')
+    print('\t%s' % ' '.join(not_enabled['ids']))
+    for description in not_enabled['descriptions']:
+        print('\t%s' % description)
+        
 if missing_repo_dirs:
-    print(
-        'Following repo directories are missing: "%s"' % str(missing_repo_dirs)
-    )
-if extra_enabled_repos:
-    print('Following enabled repos are extra: "%s"' % str(extra_enabled_repos))
+    print('Following repo directories are missing:')
+    for missing_dir in missing_repo_dirs:
+        print('\t%s' % missing_dir)
+
+if extra_enabled_repos['ids']:
+    print('Following enabled repos are extra:')
+    print('\t%s' % ' '.join(extra_enabled_repos['ids']))
+    for description in extra_enabled_repos['descriptions']:
+        print('\t%s' % description)
 
 if extra_mirrored_repos:
-    print(
-        'Following mirrored repos are extra: "%s"' % str(extra_mirrored_repos)
-    )
+    print('Following mirrored repos are extra:')
+    for extra_dir in extra_mirrored_repos:
+        print('\t%s' % extra_dir)
 
-if not_enabled or missing_repo_dirs or extra_enabled_repos \
-        or extra_mirrored_repos:
+if (
+        not_enabled['ids'] or
+        missing_repo_dirs or
+        extra_enabled_repos['ids'] or
+        extra_mirrored_repos
+):
     sys.exit(CRITICAL)
