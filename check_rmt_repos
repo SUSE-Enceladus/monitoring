@@ -139,7 +139,7 @@ with open(args.config_file_path) as json_file:
             # SLES 11 repo relative paths start with /repo, we have to
             # filter that out
             full_repo_path = '/var/lib/rmt/public/repo/' \
-                + repo_info.get('location').strip('/').split('repo')[-1]
+                + repo_info.get('location').strip('/').split('repo/')[-1]
 
             if mirrored_repos.get(full_repo_path):
                 del mirrored_repos[full_repo_path]
