@@ -18,26 +18,24 @@
 #
 """
 usage: check_proc_timed_hang -h | --help
-       check_proc_timed_hang -p PROCESS_NAME
-           [ -k KILL_SIGNAL ]
-           [ -t RUN_TIME_ALLOWANCE ]
+       check_proc_timed_hang -p <process> [-k <kill_signal>] [-t <run_time_allowance>]
 
 options:
    -h --help
        Show help
-   -p
+   -p --process-name <process>
        The name of the process to be monitored
-   -k
+   -k --kill-signal <kill_signal>
        If provided the monitored process will be killed with the
        provided signal
-   -t
+   -t --run-time-allowance <run_time_allowance>
        The runtime allotted for the process. Specify a numeric value followed
        by s (for seconds), m (for minutes), h (for hours), or d (for days).
        A value of 10m would expect the process to run for 10m. If the process
        is still running after 10m an attempt will be made to kill it with
        the given signal if provided. If either the kill attempt fails or
        no kill instruction is provided the process will be marked as critical.
-       The default allotted runtime is 1 hour.
+       The default allotted runtime is 1 hour. [default: 1h]
 """
 
 import datetime
@@ -53,9 +51,9 @@ from docopt import docopt
 # Command line processing
 command_args = docopt(__doc__)
 
-kill_signal = command_args.get('KILL_SIGNAL')
-process_name = command_args.get('PROCESS_NAME')
-allowed_runtime = command_args.get('RUN_TIME_ALLOWANCE', '1h')
+kill_signal = command_args.get('--kill-signal')
+process_name = command_args.get('--process-name')
+allowed_runtime = command_args.get('--run-time-allowance')
 
 # Nagios states
 OK = 0
