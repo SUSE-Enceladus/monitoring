@@ -17,7 +17,7 @@
 
 
 Name:           monitoring-plugins-proc-timed-hang
-Version:        20170906
+Version:        20190816
 Release:        0
 Summary:        Check a process against expiration time
 License:        GPL-2.0
@@ -27,8 +27,9 @@ Source0:        check_proc_timed_hang_%{version}.tar.bz2
 Provides:       nagios-plugins-proc-timed-hang = %{version}-%{release}
 Obsoletes:      nagios-plugins-proc-timed-hang < %{version}-%{release}
 BuildRequires:  nagios-rpm-macros
-Requires:       python-docopt
-Requires:       python-python-dateutil
+Requires:       python3-docopt
+Requires:       python3-python-dateutil
+Requires:       python3-psutil
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
 
