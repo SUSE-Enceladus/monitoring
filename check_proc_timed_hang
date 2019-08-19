@@ -112,7 +112,7 @@ if expire_time < datetime.datetime.now():
 
     msg = 'Process "%s" exceeded expiration time "%s"'
     print(msg % (process_name, expire_time))
-    sys.exit(CRITICAL)
+    sys.exit(WARNING)
 else:
     msg = 'Process "%s" within runtime allotment'
     print(msg % process_name)

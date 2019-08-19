@@ -23,7 +23,7 @@ Summary:        Check a process against expiration time
 License:        GPL-2.0
 Group:          System/Monitoring
 Url:            https://github.com/SUSE-Enceladus/monitoring
-Source0:        check_proc_timed_hang_%{version}.tar.bz2
+Source0:        monitoring-plugins-proc-timed-hang-%{version}.tar.bz2
 Provides:       nagios-plugins-proc-timed-hang = %{version}-%{release}
 Obsoletes:      nagios-plugins-proc-timed-hang < %{version}-%{release}
 BuildRequires:  nagios-rpm-macros
@@ -45,7 +45,7 @@ that have a singular instance, i.e. there can only be one entry in the process
 table for the process with the given name.
 
 %prep
-%setup -q -n check_proc_timed_hang_%{version}
+%setup -q -n monitoring-plugins-proc-timed-hang-%{version}
 
 %install
 install -D -m755 check_proc_timed_hang %{buildroot}/%{nagios_plugindir}/check_proc_timed_hang
