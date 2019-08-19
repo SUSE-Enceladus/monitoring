@@ -14,10 +14,10 @@ tar-dir-empty:
 	rm -rf "check_dir_empty_$(dirEmptyVer)"
 
 tar-proc-hang:
-	mkdir "check_proc_timed_hang_$(procHangVer)"
-	cp check_proc_timed_hang LICENSE "check_proc_timed_hang_$(procHangVer)"
-	tar -cjf "check_proc_timed_hang_$(procHangVer).tar.bz2" "check_proc_timed_hang_$(procHangVer)"
-	rm -rf "check_proc_timed_hang_$(procHangVer)"
+	mkdir "monitoring-plugins-proc-timed-hang-$(procHangVer)"
+	cp check_proc_timed_hang LICENSE "monitoring-plugins-proc-timed-hang-$(procHangVer)"
+	tar -cjf "monitoring-plugins-proc-timed-hang-$(procHangVer).tar.bz2" "monitoring-plugins-proc-timed-hang-$(procHangVer)"
+	rm -rf "monitoring-plugins-proc-timed-hang-$(procHangVer)"
 
 tar-repo-check:
 	mkdir "check_rmt_repos_$(repCheckVer)"
