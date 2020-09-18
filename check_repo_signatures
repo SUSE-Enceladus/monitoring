@@ -4,6 +4,7 @@ require 'shellwords'
 require 'logger'
 require 'optparse'
 require 'tempfile'
+require 'fileutils'
 
 class RepoSignatureChecker
   def initialize
@@ -46,6 +47,23 @@ class RepoSignatureChecker
     true
   end
 
+  def update_prometheus_data(valid, invalid, invalid_paths)
+    node_exporter_path = '/var/lib/node_exporter/textfile_collector/check_repo_signatures.prom'
+    unless Dir.exist? File.dirname(node_exporter_path)
+      begin
+        FileUtils.mkdir_p File.dirname(node_exporter_path)
+      rescue Errno::EACCES => e
+        puts "Failed to create #{node_exporter_path}: #{e.message}"
+        return
+      end
+    end
+
+    script = 'check_repo_signatures'
+    content = "#{script} {status=\"valid_repos\"} #{valid}\n" \
+              "#{script} {status=\"invalid_repos\",repos=\"#{invalid_paths}\"} #{invalid}\n"
+    File.open(node_exporter_path, 'w') { |f| f.write(content) }
+  end
+
   def run
     repodata_dirs = `find #{@repo_dir} -type d -name repodata`
     if repodata_dirs.empty?
@@ -55,12 +73,20 @@ class RepoSignatureChecker
 
     valid_repos = 0
     invalid_repos = 0
+    invalid_repos_paths = []
 
     repodata_dirs.each_line do |line|
       dir = Shellwords.escape(line.strip)
       result = check_repo(dir)
-      result ? valid_repos += 1 : invalid_repos += 1
+      if result
+        valid_repos += 1
+      else
+        invalid_repos += 1
+        invalid_repos_paths << dir
+      end
     end
+
+    update_prometheus_data(valid_repos, invalid_repos, invalid_repos_paths.join(', '))
 
     puts "Valid repos=#{valid_repos}, invalid repos=#{invalid_repos}"
     if invalid_repos > 0
