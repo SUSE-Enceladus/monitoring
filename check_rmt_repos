@@ -82,6 +82,24 @@ def get_mirrored_repos():
     return mirrored_repos
 
 
+def update_prometheus_data(metrics):
+    script = os.path.splitext(
+        os.path.basename(node_exporter_path)
+    )[0]
+    info = ''
+    with open(node_exporter_path, 'w') as prom_file:
+        for key, metric in metrics.items():
+            info = info + \
+                '{script} {{status="{status}",repos="{repos}"}} {n_repos}\n'.format(
+                    script=script,
+                    status=key,
+                    n_repos=metric.get('amount'),
+                    repos=', '.join(metric.get('repos'))
+                )
+
+        prom_file.write(info)
+
+
 # Set up command line argument parsing
 argparse = argparse.ArgumentParser(description='Monitor repo setup for RMT')
 argparse.add_argument(
@@ -99,6 +117,14 @@ argparse.add_argument(
     help=help_msg
 )
 args = argparse.parse_args()
+node_exporter_path = '/var/lib/node_exporter/textfile_collector/check_rmt_repos.prom'
+if not os.path.exists(os.path.dirname(node_exporter_path)):
+    try:
+        os.mkdir(os.path.dirname(node_exporter_path))
+    except OSError:
+        print('ERROR creating {}'.format(os.path.dirname(node_exporter_path)))
+
+
 enabled_repos = get_enabled_rmt_repos()
 mirrored_repos = get_mirrored_repos()
 
@@ -152,6 +178,27 @@ with open(args.config_file_path) as json_file:
             extra_enabled_repos['ids'].append(id)
             extra_enabled_repos['descriptions'].append(repo_description)
     extra_mirrored_repos = list(mirrored_repos.keys())
+
+metrics = {
+    'not_enabled': {
+        'amount': len(not_enabled.get('ids')),
+        'repos': not_enabled.get('ids')
+    },
+    'missing': {
+        'amount': len(missing_repo_dirs),
+        'repos': missing_repo_dirs
+    },
+    'extra_enabled': {
+        'amount': len(extra_enabled_repos.get('ids')),
+        'repos': extra_enabled_repos.get('ids')
+    },
+    'extra_mirrored': {
+        'amount': len(extra_mirrored_repos),
+        'repos': extra_mirrored_repos
+    }
+}
+update_prometheus_data(metrics)
+
 
 if not_enabled['ids']:
     print('Following expected repos are not enabled:')
