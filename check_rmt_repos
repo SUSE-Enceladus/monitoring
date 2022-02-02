@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2019 SUSE LLC  All rights reserved.
+# Copyright (c) 2022 SUSE LLC  All rights reserved.
 #
 # check_rmt_repos is free software: you can redistribute it
 # and/or modify it under the terms of the GNU General Public License
@@ -148,36 +148,42 @@ not_enabled = {'ids': [], 'descriptions': []}
 missing_repo_dirs = []
 extra_enabled_repos = {'ids': [], 'descriptions': []}
 extra_mirrored_repos = []
-with open(args.config_file_path) as json_file:
+config_repos = []
+try:
+    json_file = open(args.config_file_path)
     config_repos = json.load(json_file)
-    for config_repo in config_repos:
-        for id, repo_info in config_repo.items():
-            repo_framework = repo_info.get('framework')
-            if repo_framework and repo_framework != framework_to_use:
-                # Skip repos that are not configured for this framework
-                continue
-            configured_repo_ids.append(id)
-            if not enabled_repos.get(id):
-                not_enabled['ids'].append(id)
-                not_enabled['descriptions'].append(
-                    repo_info.get('description')
-                )
-            # SLES 11 repo relative paths start with /repo, we have to
-            # filter that out
-            full_repo_path = '/var/lib/rmt/public/repo/' \
-                + repo_info.get('location').strip('/').split('repo/')[-1]
+except:
+    print('Could not open or read "%s"' % args.config_file_path)
+    sys.exit(CRITICAL)
 
-            if mirrored_repos.get(full_repo_path):
-                del mirrored_repos[full_repo_path]
+for config_repo in config_repos:
+    repo_id = str(config_repo.get('id'))
+    repo_framework = config_repo.get('framework')
+    if repo_framework and repo_framework != framework_to_use:
+        # Skip repos that are not configured for this framework
+        continue
+    configured_repo_ids.append(repo_id)
+    if not enabled_repos.get(repo_id):
+        not_enabled['ids'].append(repo_id)
+        not_enabled['descriptions'].append(
+            config_repo.get('description')
+        )
+    # SLES 11 repo relative paths start with /repo, we have to
+    # filter that out
+    full_repo_path = '/var/lib/rmt/public/repo/' \
+        + config_repo.get('location').strip('/').split('repo')[-1]
 
-            if not os.path.exists(full_repo_path):
-                missing_repo_dirs.append(full_repo_path)
+    if mirrored_repos.get(full_repo_path):
+        del mirrored_repos[full_repo_path]
 
-    for id, repo_description in enabled_repos.items():
-        if id not in configured_repo_ids:
-            extra_enabled_repos['ids'].append(id)
-            extra_enabled_repos['descriptions'].append(repo_description)
-    extra_mirrored_repos = list(mirrored_repos.keys())
+    if not os.path.exists(full_repo_path):
+        missing_repo_dirs.append(full_repo_path)
+
+for repo_id, repo_description in enabled_repos.items():
+    if repo_id not in configured_repo_ids:
+        extra_enabled_repos['ids'].append(repo_id)
+        extra_enabled_repos['descriptions'].append(repo_description)
+extra_mirrored_repos = list(mirrored_repos.keys())
 
 metrics = {
     'not_enabled': {
