@@ -168,10 +168,8 @@ for config_repo in config_repos:
         not_enabled['descriptions'].append(
             config_repo.get('description')
         )
-    # SLES 11 repo relative paths start with /repo, we have to
-    # filter that out
     full_repo_path = '/var/lib/rmt/public/repo/' \
-        + config_repo.get('location').strip('/').split('repo')[-1]
+        + config_repo.get('location').strip('/')
 
     if mirrored_repos.get(full_repo_path):
         del mirrored_repos[full_repo_path]
