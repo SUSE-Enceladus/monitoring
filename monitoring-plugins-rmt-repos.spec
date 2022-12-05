@@ -17,7 +17,7 @@
 
 
 Name:           monitoring-plugins-rmt-repos
-Version:        20220202
+Version:        20221202
 Release:        0
 Summary:        Verify enablement and presence of RMT repositories
 License:        GPL-2.0
