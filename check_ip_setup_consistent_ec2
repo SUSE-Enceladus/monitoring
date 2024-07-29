@@ -1,0 +1,160 @@
+#!/usr/bin/python3
+
+# Copyright (c) 2024 SUSE LLC  All rights reserved.
+#
+# check_dir_empty is free software: you can redistribute it
+# and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 2 of
+# the License.
+#
+# check_dir_empty is distributed in the hope that it will
+# be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with susePublicCloudInfoClient. If not, see
+# <http://www.gnu.org/licenses/>.
+#
+
+import glob
+import OpenSSL
+import os
+import sys
+
+from datetime import datetime, timedelta
+
+from ec2metadata import EC2Metadata, EC2MetadataError
+
+# Nagios states
+OK = 0
+WARNING = 1
+CRITICAL = 2
+UNKNOWN = 3
+
+metadata = EC2Metadata(api='latest')
+ipv6_addr = ''
+ipv4_addr = ''
+try:
+    ipv6_addr = metadata.get('ipv6')
+except EC2MetadataError:
+    pass
+
+try:
+    ipv4_addr = metadata.get('public-ipv4')
+except EC2MetadataError:
+    pass
+
+# Pretty much everything below here can be reused for other CSPs
+msg = ''
+is_critical = False
+
+
+def check_expiry_date(cert_path):
+    global msg
+    global is_critical
+    cert_content = open(cert_path, 'r').read()
+    cert = OpenSSL.crypto.load_certificate(
+        OpenSSL.crypto.FILETYPE_PEM, cert_content
+    )
+    # Strip the time zone identifier, server should be set to UTC
+    # At worst case we're off by a day and if you leave your certs that
+    # long it's you own fault.
+    expiry_date = datetime.strptime(
+        cert.get_notAfter().decode('utf-8')[:-1], '%Y%m%d%H%M%S'
+    )
+    # Critical if the certs expires in about 6 months
+    now = datetime.utcnow()
+    if (expiry_date - now) < timedelta(days=182):
+        is_critical = True
+    if (expiry_date - now) < timedelta(days=365):
+        msg += 'Replace %s at your earliest convenience\n' % cert_path
+        msg += '\tExpires on %s\n' % datetime.strftime(expiry_date, '%Y-%m-%d')
+
+
+# Region server or update server?
+region_srv = False
+update_srv = False
+
+if os.path.exists('/etc/regionService/regionInfo.cfg'):
+    region_srv = True
+if os.path.exists('/etc/rmt.conf'):
+    update_srv = True
+
+# Check server consitency
+if region_srv:
+    have_ipv6_vhost = False
+    have_ipv4_vhost = False
+    have_ipv6_vhost_cert = False
+    have_ipv4_vhost_cert = False
+    have_ipv6_cert = False
+    have_ipv4_cert = False
+    vhost_config = open(
+        '/etc/apache2/vhosts.d/regionsrv_vhost.conf', 'r').readlines()
+    for entry in vhost_config:
+        if ipv6_addr:
+            if entry.strip().startswith('<VirtualHost') and ipv6_addr in entry:
+                have_ipv6_vhost = True
+                continue
+            if 'SSLCertificateFile' and ipv6_addr in entry:
+                have_ipv6_vhost_cert = True
+                # The web srever will not start if:
+                # - we have a cert configured that does not exist
+                # - we have a key configured that does not exist or does not
+                #   match the cert
+                # no need to check for these conditions
+        if ipv4_addr:
+            if (entry.strip().startswith('<VirtualHost')
+                and ((ipv4_addr in entry) or ('*' in entry))):
+                    have_ipv4_vhost = True
+                    continue
+            if 'SSLCertificateFile' and ipv4_addr in entry:
+                have_ipv4_vhost_cert = True
+                # The web srever will not start if:
+                # - we have a cert configured that does not exist
+                # - we have a key configured that does not exist or does not
+                #   match the cert
+                # no need to check for these conditions
+    certs = glob.glob('/etc/apache2/ssl.crt/*.crt')
+    superfluous = []
+    for cert in certs:
+        if 'README' in cert:
+            continue
+        if 'prometheus' in cert:
+            check_expiry_date(cert)
+            continue
+        if ipv6_addr and ipv6_addr in cert:
+            have_ipv6_cert = True
+            check_expiry_date(cert)
+            continue
+        if ipv4_addr and ipv4_addr in cert:
+            have_ipv4_cert = True
+            check_expiry_date(cert)
+            continue
+        superfluous.append(cert.split(os.sep)[-1])
+
+    if ipv6_addr:
+        if not have_ipv6_cert:
+            msg += 'IPv6 cert for %s missing\n' % ipv6_addr
+        if not have_ipv6_vhost_cert:
+            msg += 'IPv6 cert for %s not configured in vhost file\n' % ipv6_addr
+    if ipv4_addr:
+        if not have_ipv4_cert:
+            msg += 'IPv6 cert for %s missing\n' % ipv4_addr
+        if not have_ipv4_vhost_cert:
+            msg += 'IPv6 cert for %s not configured in vhost file\n' % ipv4_addr
+    if superfluous:
+        msg += 'Extra certs on %s: %s' % (ipv4_addr, superfluous)
+
+if update_srv:
+    # Update servers run nginx implementation TBD
+    pass
+            
+        
+if msg:
+    print(msg)
+    if is_critical:
+        sys.exit(CRITICAL)
+    sys.exit(WARNING)
+
+sys.exit(OK)
