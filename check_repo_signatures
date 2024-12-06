@@ -101,4 +101,12 @@ class RepoSignatureChecker
   end
 end
 
+loop do
+  mirror_status = `systemctl is-active rmt-server-mirror.service`
+  if mirror_status.strip.downcase == "active"
+    sleep 300
+  else
+    break
+  end
+end
 RepoSignatureChecker.new.run
