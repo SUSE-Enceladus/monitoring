@@ -18,11 +18,13 @@
 #
 
 import argparse
+import csv
 import json
 import os
 import subprocess
 import sys
-import csv
+import yaml
+
 from io import StringIO
 
 # Nagios states
@@ -57,6 +59,28 @@ def get_enabled_rmt_repos():
     return rmt_repos
 
 
+def get_pass_through_repos():
+    """RMT has a configuration option to allow repositories to be set up
+       as pass through, meaning the content of those repositories does not
+       get coppied onto the RMT server. We need to skip these repos when
+       checking for precense of content on the server."""
+    rmt_config_path = '/etc/rmt.conf'
+    pass_through_repos = []
+    if not os.path.exists(rmt_config_path):
+        return pass_through_repos
+    rmt_config = {}
+    try:
+        with open(rmt_config_path, 'r') as f:
+            rmt_config = yaml.safe_load(f)
+    except:
+        return pass_through_repos
+    mirror_config = rmt_config.get('mirroring')
+    if mirror_config:
+        pass_through_repos = mirror_config.get('redirect_repo_hosts', [])
+
+    return pass_through_repos
+    
+        
 def get_rmt_cli_command():
     rmt_cli_pid = get_rmt_cli_pid()
     rmt_cli_cmd = None
@@ -156,6 +180,7 @@ except:
     print('Could not open or read "%s"' % args.config_file_path)
     sys.exit(CRITICAL)
 
+pass_through_domains = get_pass_through_repos()
 for config_repo in config_repos:
     repo_id = str(config_repo.get('id'))
     repo_framework = config_repo.get('framework')
@@ -174,8 +199,12 @@ for config_repo in config_repos:
     if mirrored_repos.get(full_repo_path):
         del mirrored_repos[full_repo_path]
 
-    if not os.path.exists(full_repo_path):
-        missing_repo_dirs.append(full_repo_path)
+    for domain in pass_through_domains:
+        if domain in config_repo.get('url', ''):
+            break
+    else:
+        if not os.path.exists(full_repo_path):
+            missing_repo_dirs.append(full_repo_path)
 
 for repo_id, repo_description in enabled_repos.items():
     if repo_id not in configured_repo_ids:
