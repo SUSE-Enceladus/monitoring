@@ -17,7 +17,7 @@
 
 
 Name:           monitoring-plugins-rmt-repos
-Version:        20221202
+Version:        20260313
 Release:        0
 Summary:        Verify enablement and presence of RMT repositories
 License:        GPL-2.0
@@ -27,6 +27,7 @@ Source0:        check_rmt_repos_%{version}.tar.bz2
 Provides:       nagios-plugins-check_rmt_repos = %{version}-%{release}
 Obsoletes:      nagios-plugins-check_rmt_repos < %{version}-%{release}
 Requires:       python3
+Requires:       python3-PyYAML
 Requires:       rmt-server
 
 BuildRequires:  nagios-rpm-macros
